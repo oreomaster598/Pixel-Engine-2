@@ -26,13 +26,13 @@ namespace PE2.Components
         public Sprite(Shader shader)
         {
             this.shader = shader;
-            this.shader.useBitmap(bitmap);
+            //this.shader.useBitmap(bitmap);
         }
 
         public override void Draw()
         {
             if (shader != null)
-                Renderer.DrawRect(gameObject.size, gameObject.position, shader.UseShader());
+                Renderer.DrawRect(gameObject.size, gameObject.position, new SKPaint() { Color = new SKColor(255,255,255)});
             else
                 Renderer.DrawBitmap(bitmap, gameObject.size, gameObject.position);
         }

@@ -15,63 +15,107 @@ using PE2.Graphics;
 using SkiaSharp;
 using SkiaSharp.Views.Desktop;
 using OpenTK.Input;
+using Timer = System.Timers.Timer;
+using PE2.Physics.Dynamics;
+using PE2.Math;
 
 namespace PE2
 {
-
-    public partial class Main : Form
+    public  class Main : Form
     {
+        public static List<GameObject> gameObjects = new List<GameObject>();
+
+
+        public static double DeltaTime;
+        public static double Secondframe;
         public static bool run = true;
+        public static int fps = 0;
+        public static uint speed = 1;
+        public static bool SkipFrame = false;
+        public static World world;
+        int gridres = 25;
+        long _frameCount = 0;
+
+
+        public static Camera CurrentCamera;
 
         public static Vector2 mousePosition = Vector2.Zero;
 
-        public static List<GameObject> gameObjects = new List<GameObject>();
-        public SKColor Background = new SKColor(200,200,200);
-        public static int fps = 0;
-        public SKBitmap bmp;
+        public SKColor Background = new SKColor(128,128,128);
+ 
 
-
-        public GameSettings gameSettings;
-        public WindowSettings windowSettings;
+        public static GameSettings gameSettings;
+        public static WindowSettings windowSettings;
+        DateTime _lastCheckTime = DateTime.Now;
+        public RadioButton radioButton1;
+        public RadioButton radioButton2;
+        public static SKTypeface font;
 
         public Main(GameSettings gameSettings, WindowSettings windowSettings)
         {
-            this.gameSettings = gameSettings;
-            this.windowSettings = windowSettings;
+            Main.gameSettings = gameSettings;
+            Main.windowSettings = windowSettings;
             InitializeComponent();
 
             this.ClientSize = new Size((int)windowSettings.Size.x, (int)windowSettings.Size.y);
             this.Text = windowSettings.Title;
-            
+
             skgl.VSync = windowSettings.VSync;
 
-            bmp = SKBitmap.Decode("img.png");
+            font = SKTypeface.Default;
 
-            gameObjects.Add(new GameObject(new Vector2(20, 20), new Vector2(50, 50), new Sprite(bmp), new test()));
 
-            gameObjects.Add(new GameObject(new Vector2(50, 50), new Vector2(150, 150), new Sprite(bmp)));
+            world = new World(new Physics.Collision.AABB() { UpperBound = new Vector2(1000, 1000), LowerBound = new Vector2(-1000, -1000) }, new Vector2(0, 20), true) ; 
+            LoadContent();
+
+            Application.Idle += Loop;
 
 
         }
 
-        public static double DeltaTime;
-        public static double Secondframe;
-        public void Loop()
+
+        public static void RegisterGameObject(GameObject gm)
         {
-            while(run)
-            {
+            gm.index = (uint)gameObjects.Count;
+            gameObjects.Add(gm);
+        }
+
+        public static void UnRegisterGameObject(GameObject gm)
+        {
+            foreach (Components.Component c in gm.components)
+                c.OnDestroy();
+            gameObjects.Remove(gm);
+        }
+        float timeStep = 1.0f / 60.0f;
+        int velocityIterations = 8;
+        int positionIterations = 1;
+        public void Loop(object sender, EventArgs e)
+        {
+           // while(run)
+           // {
+
                 try
                 {
-                    Thread.Sleep(1);
+                    //Cap fps at 60
+                    Thread.Sleep((int)speed);
+                    world.Step(timeStep, velocityIterations, positionIterations);
 
-                    fps = (int)GetFps();
+                    Point p = skgl.PointToClient(Cursor.Position);
+                    Input.MousePosition = new Vector2(p.X, p.Y);
+
+                    int tfps = (int)GetFps();
+                    if(tfps > -1)
+                        fps = tfps;
 
                     foreach (GameObject gm in gameObjects)
                         gm.PreUpdate();
                     PreUpdate();
-                    this.BeginInvoke((MethodInvoker)delegate { skgl.Invalidate(); });
+
+                    if(run)
+                        skgl.Invalidate();
+
                     Input.Update();
-                    foreach (GameObject gm in gameObjects)
+                    foreach (GameObject gm in gameObjects.ToArray())
                         gm.Update();
                     if (Input.isKeyDown(Key.Minus) && gameSettings.DebugMode && gridres >= 10)
                         gridres--;
@@ -80,21 +124,26 @@ namespace PE2
                     Update();
                 }
                 catch (Exception ex)
-                {
+                { 
 
                 }
 
-            }
+           // }
             
 
         }
 
-
         public virtual void Update() { }
+
+        public virtual void Draw() { }
+        public virtual void PreDraw() { }
+
+
+        public virtual void LoadContent() { }
+        public virtual void UnloadContent() { }
 
         public virtual void PreUpdate() { }
 
-        int gridres = 25;
 
         public int ParseNoRound(float f)
         {
@@ -104,16 +153,12 @@ namespace PE2
             return int.Parse(s);
         }
 
-        DateTime _lastCheckTime = DateTime.Now;
-        long _frameCount = 0;
-
-        // called whenever a map is updated
+   
         void OnMapUpdated()
         {
             Interlocked.Increment(ref _frameCount);
         }
 
-        // called every once in a while
         public double GetFps()
         {
             double secondsElapsed = (DateTime.Now - _lastCheckTime).TotalSeconds;
@@ -125,62 +170,48 @@ namespace PE2
 
         private void skglControl1_PaintSurface(object sender, SKPaintGLSurfaceEventArgs e)
         {
-            SKCanvas canvas = e.Surface.Canvas;
-            canvas.Clear(Background);
-
-            Renderer.Begin(canvas);
-            Rectangle Bounds = skgl.ClientRectangle;
-            if (gameSettings.DebugMode)
+            if(SkipFrame)
             {
-                SKPath p = new SKPath();
-                int xlines = Bounds.Width / gridres + 1;
-                int ylines = Bounds.Height / gridres + 1;
-
-                using (var paint = new SKPaint())
-                {
-                    paint.Color = new SKColor(64, 64, 64);
-                    paint.Style = SKPaintStyle.Stroke;
-                    paint.StrokeWidth = 1;
-
-                    // Draw the Horizontal Grid Lines
-                    for (int i = 0; i < ylines; i++)
-                    {
-                        var y = i * gridres;
-                        var leftPoint = new SKPoint(Bounds.Left, y);
-                        var rightPoint = new SKPoint(Bounds.Right, y);
-
-                        p.AddPoly(new SKPoint[] { leftPoint, rightPoint });
-                    }
-
-                    // Draw the Vertical Grid Lines
-                    for (int i = 0; i < xlines; i++)
-                    {
-                        var x = i * gridres;
-                        var topPoint = new SKPoint(x, Bounds.Top);
-                        var bottomPoint = new SKPoint(x, Bounds.Bottom);
-
-                        p.AddPoly(new SKPoint[] { topPoint, bottomPoint });
-                    }
-                    Renderer.DrawPath(p, paint);
-                }
+                SkipFrame = false;
+                return;
             }
+            try
+            {
+                SKCanvas canvas = e.Surface.Canvas;
+                //canvas.Clear(Background);
 
-            foreach (GameObject gm in gameObjects)
-                gm.Draw();
-            OnMapUpdated();
-            Renderer.End();
-            Console.Write("\rDraw Calls: {0}    |    Batches: {1}    |    FPS: {2}     ", Renderer.DrawCalls, Renderer.batches, fps);
+                Renderer.Begin();
+                Rectangle Bounds = skgl.ClientRectangle;
+                PreDraw();
+                Renderer.Transform();
+
+                foreach (GameObject gm in gameObjects)
+                    gm.Draw();
+                Draw();
+                OnMapUpdated();
+                Renderer.End(ref canvas);
+                canvas.Flush();
+                Console.Write("\rDraw Calls: {0}    |    Batches: {1}    |    FPS: {2}     |    Resolution: {3}", Renderer.DrawCalls, Renderer.batches, fps, CurrentCamera.resolution);
+            }
+            catch(Exception ex)
+            {
+                Debug.LogError(ex.Message, "PE Core");
+            }
+           
         }
 
-        //  start/stop game loop
+
 
         private void OnLoad(object sender, EventArgs e)
         {
-            Task.Factory.StartNew(Loop);
+            //Task.Factory.StartNew(Loop);
         }
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
+            UnloadContent();
             gameObjects.Clear();
+            skgl.Dispose();
+            skgl = null;
             run = false;
         }
 
@@ -194,46 +225,84 @@ namespace PE2
             if (disposing && (components != null))
             {
                 components.Dispose();
+                components = null;
             }
             base.Dispose(disposing);
         }
 
         #region Windows Form Designer generated code
 
-        /// <summary>
-        /// Required method for Designer support - do not modify
-        /// the contents of this method with the code editor.
-        /// </summary>
+
         private void InitializeComponent()
         {
             this.skgl = new SkiaSharp.Views.Desktop.SKGLControl();
+            this.radioButton1 = new System.Windows.Forms.RadioButton();
+            this.radioButton2 = new System.Windows.Forms.RadioButton();
             this.SuspendLayout();
             // 
-            // skglControl1
+            // skgl
             // 
-            this.skgl.BackColor = System.Drawing.Color.Black;
+            this.skgl.BackColor = System.Drawing.Color.Transparent;
             this.skgl.Dock = System.Windows.Forms.DockStyle.Fill;
             this.skgl.Location = new System.Drawing.Point(0, 0);
-            this.skgl.Name = "skglControl1";
-            this.skgl.Size = new System.Drawing.Size(800, 450);
+            this.skgl.Name = "skgl";
+            this.skgl.Size = new System.Drawing.Size(284, 261);
             this.skgl.TabIndex = 0;
+            this.skgl.VSync = false;
             this.skgl.PaintSurface += new System.EventHandler<SkiaSharp.Views.Desktop.SKPaintGLSurfaceEventArgs>(this.skglControl1_PaintSurface);
             // 
-            // Form1
+            // radioButton1
+            // 
+            this.radioButton1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.radioButton1.AutoSize = true;
+            this.radioButton1.BackColor = System.Drawing.Color.Transparent;
+            this.radioButton1.Checked = true;
+            this.radioButton1.Location = new System.Drawing.Point(214, 0);
+            this.radioButton1.Name = "radioButton1";
+            this.radioButton1.Size = new System.Drawing.Size(70, 17);
+            this.radioButton1.TabIndex = 1;
+            this.radioButton1.TabStop = true;
+            this.radioButton1.Text = "Camera 1";
+            this.radioButton1.UseVisualStyleBackColor = false;
+            // 
+            // radioButton2
+            // 
+            this.radioButton2.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.radioButton2.AutoSize = true;
+            this.radioButton2.Location = new System.Drawing.Point(214, 23);
+            this.radioButton2.Name = "radioButton2";
+            this.radioButton2.Size = new System.Drawing.Size(70, 17);
+            this.radioButton2.TabIndex = 2;
+            this.radioButton2.TabStop = true;
+            this.radioButton2.Text = "Camera 2";
+            this.radioButton2.UseVisualStyleBackColor = true;
+            // 
+            // Main
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.ClientSize = new System.Drawing.Size(284, 261);
+            this.Controls.Add(this.radioButton2);
+            this.Controls.Add(this.radioButton1);
             this.Controls.Add(this.skgl);
-            this.Name = "Form1";
+            this.Name = "Main";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form1_FormClosing);
-            this.Load += OnLoad;
+            this.SizeChanged += new System.EventHandler(this.Main_SizeChanged);
             this.ResumeLayout(false);
+            this.PerformLayout();
 
         }
 
         #endregion
 
         private SKGLControl skgl;
+
+        private void Main_SizeChanged(object sender, EventArgs e)
+        {
+            SkipFrame = true;
+            windowSettings.Size = new Vector2(ClientSize.Width, ClientSize.Height);
+        }
+
     }
 
    

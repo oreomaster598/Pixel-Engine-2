@@ -1,4 +1,5 @@
 ﻿using PE2.Components;
+using PE2.Math;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +12,9 @@ namespace PE2
     {
         public Vector2 position;
         public Vector2 size;
+        public string tag;
+        public bool active;
+        public uint index;
         public Component[] components;
 
         public GameObject(Vector2 size, Vector2 position, params Component[] components)
@@ -22,11 +26,21 @@ namespace PE2
             foreach (Component component in this.components)
             {
                 component.gameObject = this;
-                component.Start();
+                component.Load();
             }
 
         }
 
+
+        public void Move(Vector2 Amount)
+        {
+            position += Amount - (size / 2);
+        }
+
+        public void Destroy()
+        {
+            Main.UnRegisterGameObject(this);
+        }
 
         public Component GetComponent<T>()
         {

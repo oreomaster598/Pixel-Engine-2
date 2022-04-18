@@ -1,4 +1,5 @@
-﻿using System;
+﻿using PE2.Math;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -23,12 +24,12 @@ namespace PE2
             };
             WindowSettings windowSettings = new WindowSettings()
             {
-                VSync = false,
-                Size = new Vector2(816, 489),
+                VSync = true,
+                Size = new Vector2(1200, 600),
                 Title = "PixelEngine 2.0"
             };
 
-            Application.Run(new Main(gameSettings, windowSettings));
+            Application.Run(new Game(gameSettings, windowSettings));
         }
     }
 }

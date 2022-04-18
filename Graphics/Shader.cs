@@ -29,12 +29,21 @@ namespace PE2.Graphics
         public SKRuntimeEffect effect;
         public SKRuntimeEffectUniforms uniforms;
         public SKRuntimeEffectChildren children;
+
+        public static string Default = "half4 main(vec2 frag) { return half4(1,1,1,1); }";
+        public static string Texture = "uniform fragmentProcessor map; uniform vec2 size; uniform vec2 isize; half4 main(vec2 frag) { vec2 scale = isize/size; return sample(map, frag*scale); }";
+        private static bool Failed = false;
         public static Shader Compile(string sksl)
         {
             string errorText = "";
             Shader s = new Shader();
             SKRuntimeEffect effect = SKRuntimeEffect.Create(sksl, out errorText);
-            Console.WriteLine(errorText);
+            if(effect == null)
+            {
+                Debug.LogError(errorText, "Shader");
+                effect = SKRuntimeEffect.Create(Default, out errorText);
+                Failed = true;
+            }
             s.children = new SKRuntimeEffectChildren(effect);
             s.uniforms = new SKRuntimeEffectUniforms(effect);
             s.effect = effect;
@@ -44,8 +53,17 @@ namespace PE2.Graphics
 
         public static Shader CompileFromFile(string path)
         {
+            string errorText = "";
             Shader s = new Shader();
-            SKRuntimeEffect effect = SKRuntimeEffect.Create(File.ReadAllText(path), out var errorText);
+            SKRuntimeEffect effect = SKRuntimeEffect.Create(File.ReadAllText(path),out errorText);
+
+            if (effect == null)
+            {
+                Debug.LogError(errorText, "Shader");
+                effect = SKRuntimeEffect.Create(Default, out errorText);
+                Failed = true;
+            }
+
             s.children = new SKRuntimeEffectChildren(effect);
             s.uniforms = new SKRuntimeEffectUniforms(effect);
             s.effect = effect;
@@ -55,25 +73,26 @@ namespace PE2.Graphics
 
         public void setUniforms(params Uniform[] uniforms)
         {
+            if (Failed)
+                return;
             foreach (Uniform uniform in uniforms)
             {
-                this.uniforms = new SKRuntimeEffectUniforms(effect);
-                if (uniform.value.Length > 1)
-                    this.uniforms.Add(uniform.name, uniform.value);
-                else if (uniform.value.Length > 0)
-                    this.uniforms.Add(uniform.name, uniform.value[0]);
+                this.uniforms[uniform.name] = uniform.value;
             }
 
         }
 
         public void useBitmap(SKBitmap bitmap)
         {
+            if (Failed)
+                return;
             if (bitmap != null)
             {
-                SKShader textureShader = bitmap.ToShader();
-                children.Add("color_map", textureShader);
+                    children.Add("color_map", bitmap.ToShader());
+
             }
         }
+
 
         public SKPaint UseShader()
         {

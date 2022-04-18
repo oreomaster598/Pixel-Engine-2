@@ -10,7 +10,8 @@ namespace PE2.Components
     {
         public GameObject gameObject;
 
-        public virtual void Start() { }
+        public virtual void OnDestroy() { }
+        public virtual void Load() { }
         public virtual void PreUpdate() { }
         public virtual void Update() { }
         public virtual void Draw() { }

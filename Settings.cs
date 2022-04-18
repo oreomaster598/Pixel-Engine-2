@@ -1,4 +1,5 @@
-﻿using System;
+﻿using PE2.Math;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,6 +12,7 @@ namespace PE2
         public bool VSync;
         public Vector2 Size;
         public string Title;
+        public int TargetFPS;
     }
 
     public struct GameSettings
